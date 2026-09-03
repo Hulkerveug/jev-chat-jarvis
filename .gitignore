@@ -3,3 +3,16 @@ contacts.csv
 jarvis.db
 /engine/__pycache__
 /engine/cookies.json
+
+# yt-dlp install artifacts
+bin/yt-dlp.exe
+share/
+yt_dlp/
+yt_dlp-*.dist-info/
+
+# hulker skill — exclude runtime + bytecode
+skills/hulker/data/
+skills/hulker/data_backup/
+skills/hulker/tmp/
+skills/hulker/hulker/__pycache__/
+skills/hulker/skills/__pycache__/

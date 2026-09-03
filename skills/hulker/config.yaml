@@ -1,0 +1,36 @@
+# Hulker Voice Automation - Configuration
+
+wake_word: "HULKER"
+sensitivity: 0.5          # wake word detection sensitivity (0.0-1.0)
+
+stt:
+  engine: "whisper"       # whisper | none (raw text)
+  model: "base"           # tiny, base, small, medium, large
+  language: "en"
+  device: "cpu"
+
+tts:
+  engine: "edge"          # edge (edge-tts) | system (sapi)
+  voice: "en-US-JennyNeural"
+  rate: "+0%"
+  volume: "+0%"
+
+mic:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+  silence_threshold: 0.01   # amplitude below this = silence
+  silence_duration: 1.0     # seconds of silence to end utterance
+
+actions:
+  mouse:
+    click_delay: 0.05       # seconds between click down/up
+    move_delay: 0.02        # seconds for mouse movement
+  keyboard:
+    type_delay: 0.02        # seconds between keystrokes
+
+skills_dir: "skills"        # directory for skill scripts
+
+logging:
+  level: "INFO"
+  file: "hulker.log"
