@@ -177,7 +177,7 @@ def whatsApp(mobile_no, message, flag, name):
 # chat bot 
 def chatBot(query):
     user_input = query.lower()
-    chatbot = hugchat.ChatBot(cookie_path="engine\cookies.json")
+    chatbot = hugchat.ChatBot(cookie_path=r"engine\cookies.json")
     id = chatbot.new_conversation()
     chatbot.change_conversation(id)
     response =  chatbot.chat(user_input)
@@ -188,17 +188,30 @@ def chatBot(query):
 # android automation
 
 def makeCall(name, mobileNo):
-    mobileNo =mobileNo.replace(" ", "")
+    from engine.helper import ensure_device, _run_adb
+    import re
+    mobileNo = re.sub(r"[^\d+]", "", str(mobileNo))
     speak("Calling "+name)
-    command = 'adb shell am start -a android.intent.action.CALL -d tel:'+mobileNo
-    os.system(command)
+    if not ensure_device():
+        speak("No Android device connected. Phone path was removed from this install.")
+        print("[adb] makeCall aborted: no authorized device.")
+        return False
+    code, out = _run_adb("shell", "am", "start", "-a",
+                         "android.intent.action.CALL", "-d", "tel:" + mobileNo)
+    if code != 0:
+        print(f"[adb] makeCall failed: {out.strip()}")
+        speak("Call failed. Check device authorization.")
+        return False
+    return True
 
 
 # to send message
 def sendMessage(message, mobileNo, name):
-    from engine.helper import replace_spaces_with_percent_s, goback, keyEvent, tapEvents, adbInput
-    message = replace_spaces_with_percent_s(message)
-    mobileNo = replace_spaces_with_percent_s(mobileNo)
+    from engine.helper import ensure_device, goback, keyEvent, tapEvents, adbInput
+    if not ensure_device():
+        speak("No Android device connected. Phone path was removed from this install.")
+        print("[adb] sendMessage aborted: no authorized device.")
+        return False
     speak("sending message")
     goback(4)
     time.sleep(1)
@@ -218,6 +231,7 @@ def sendMessage(message, mobileNo, name):
     #send
     tapEvents(957, 1397)
     speak("message send successfully to "+name)
+    return True
 
 import google.generativeai as genai
 def geminai(query):

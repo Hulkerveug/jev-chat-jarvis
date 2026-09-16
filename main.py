@@ -4,14 +4,16 @@ import eel
 from engine.features import *
 from engine.command import *
 from engine.auth import recoganize
+
+
 def start():
-    
+
     eel.init("www")
 
     playAssistantSound()
     @eel.expose
     def init():
-        subprocess.call([r'device.bat'])
+        # Local-only install: no phone/device connection step.
         eel.hideLoader()
         speak("Ready for Face Authentication")
         flag = recoganize.AuthenticateFace()
