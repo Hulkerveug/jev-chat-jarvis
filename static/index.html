@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XTOBE AI Voice Agent — WebSocket + REST</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; }
+    .header { background: #0f0f1a; padding: 16px 24px; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-family: 'Orbitron', monospace; font-weight: 900; font-size: 20px; background: linear-gradient(90deg, #ff3d00, #ff9100); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 3px; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #00e676; box-shadow: 0 0 8px #00e676; animation: pulse 2s infinite; }
+    .dot.off { background: #ff1744; box-shadow: 0 0 8px #ff1744; }
+    .dot.warn { background: #ffea00; box-shadow: 0 0 8px #ffea00; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 24px; }
+    .voice-circle { position: relative; width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; }
+    .mic-btn { width: 120px; height: 120px; border-radius: 50%; border: none; background: linear-gradient(135deg, #ff3d00, #ff9100); color: #fff; font-size: 48px; cursor: pointer; box-shadow: 0 4px 30px rgba(255,61,0,0.4); transition: all 0.3s; z-index: 2; position: relative; }
+    .mic-btn:hover { transform: scale(1.1); }
+    .mic-btn.listening { background: linear-gradient(135deg, #ff1744, #ff3d00); animation: micPulse 1.2s infinite; }
+    .mic-btn.thinking { background: linear-gradient(135deg, #ffea00, #ff9100); animation: micPulse 0.8s infinite; }
+    .mic-btn.speaking { background: linear-gradient(135deg, #00e676, #00e5ff); animation: micPulse 1.5s infinite; }
+    @keyframes micPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.5); } 50% { box-shadow: 0 0 0 24px rgba(255,23,68,0); } }
+    .wave-ring { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 2px solid rgba(255,61,0,0.3); opacity: 0; transition: all 0.3s; }
+    .wave-ring.active { opacity: 1; animation: waveExpand 1.5s infinite; }
+    .wave-ring:nth-child(2) { animation-delay: 0.5s; }
+    .wave-ring:nth-child(3) { animation-delay: 1s; }
+    @keyframes waveExpand { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.5); opacity: 0; } }
+    .status-text { font-size: 18px; color: #aaa; text-align: center; min-height: 28px; }
+    .transcript-box { width: 100%; max-width: 600px; background: #111118; border: 1px solid #1a1a2e; border-radius: 12px; padding: 20px; min-height: 120px; }
+    .transcript-box .label { font-size: 11px; color: #666; letter-spacing: 2px; margin-bottom: 12px; font-family: 'Orbitron', monospace; }
+    .transcript-box .text { font-size: 16px; line-height: 1.6; color: #ccc; }
+    .transcript-box .text .partial { color: #ff9100; font-style: italic; }
+    .chat-area { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 12px; }
+    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input { flex: 1; background: #111118; border: 1px solid #1a1a2e; border-radius: 8px; padding: 12px 16px; color: #e0e0e0; font-family: 'Rajdhani', sans-serif; font-size: 15px; outline: none; }
+    .chat-input:focus { border-color: #ff3d00; }
+    .chat-btn { background: linear-gradient(135deg, #ff3d00, #ff9100); color: #fff; border: none; border-radius: 8px; padding: 12px 20px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    .model-row { display: flex; gap: 8px; align-items: center; }
+    .model-select { background: #111118; border: 1px solid #1a1a2e; border-radius: 6px; padding: 8px 12px; color: #e0e0e0; font-size: 13px; }
+    .voice-select { background: #111118; border: 1px solid #1a1a2e; border-radius: 6px; padding: 8px 12px; color: #e0e0e0; font-size: 13px; }
+    .log-area { background: #050508; border-top: 1px solid #1a1a2e; padding: 12px 24px; font-family: 'Courier New', monospace; font-size: 11px; color: #666; max-height: 100px; overflow-y: auto; }
+    .log-entry { margin-bottom: 3px; }
+    .log-time { color: #00e5ff; }
+    .ok { color: #00e676; }
+    .warn { color: #ffea00; }
+    .err { color: #ff1744; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">XTOBE VOICE AGENT</div>
+    <div class="status"><div class="dot" id="statusDot"></div> <span id="statusLabel">Connecting...</span></div>
+  </div>
+
+  <div class="main">
+    <div class="voice-circle">
+      <div class="wave-ring" id="ring1"></div>
+      <div class="wave-ring" id="ring2"></div>
+      <div class="wave-ring" id="ring3"></div>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙️</button>
+    </div>
+
+    <div class="status-text" id="statusText">Tap the mic to speak</div>
+
+    <div class="transcript-box">
+      <div class="label">📝 TRANSCRIPT</div>
+      <div class="text" id="transcriptText">Your speech will appear here...</div>
+    </div>
+
+    <div class="chat-area">
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter'){sendChat()}">
+        <button class="chat-btn" onclick="sendChat()">SEND</button>
+      </div>
+      <div class="model-row">
+        <select class="model-select" id="modelSelect">
+          <option value="llama3.2:latest">Llama 3.2 (fast)</option>
+          <option value="llama3.1:8b">Llama 3.1 8B</option>
+          <option value="XTOBE:latest">Xtobe Ai</option>
+          <option value="XTOBE-Production:latest">Xtobe Production</option>
+          <option value="qwen2:7b">Qwen2 7B</option>
+          <option value="hermes3:8b">Hermes 3 8B</option>
+          <option value="gemma2:9b">Gemma2 9B</option>
+          <option value="phi3:latest">Phi-3</option>
+        </select>
+        <select class="voice-select" id="voiceSelect">
+          <option value="english_female">English (Female)</option>
+          <option value="english_male">English (Male)</option>
+          <option value="tamil_female">Tamil (Female)</option>
+          <option value="tamil_male">Tamil (Male)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="log-area" id="logArea">
+    <div class="log-entry"><span class="log-time">[00:00:00]</span> <span class="ok">✓</span> Initializing...</div>
+  </div>
+
+  <script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+    let synth = window.speechSynthesis;
+    let audioCtx = null;
+    let analyser = null;
+    let dataArray = null;
+    let source = null;
+    let stream = null;
+
+    function updateStatus(text, state) {
+      document.getElementById('statusText').textContent = text;
+      const dot = document.getElementById('statusDot');
+      const label = document.getElementById('statusLabel');
+      dot.className = 'dot' + (state === 'off' ? ' off' : state === 'warn' ? ' warn' : '');
+      label.textContent = state === 'off' ? 'Offline' : state === 'warn' ? 'Busy' : 'Online';
+    }
+
+    function setMicState(state) {
+      const btn = document.getElementById('micBtn');
+      btn.className = 'mic-btn' + (state ? ' ' + state : '');
+      document.getElementById('ring1').className = 'wave-ring' + (state ? ' active' : '');
+      document.getElementById('ring2').className = 'wave-ring' + (state ? ' active' : '');
+      document.getElementById('ring3').className = 'wave-ring' + (state ? ' active' : '');
+    }
+
+    function addLog(msg, type = 'ok') {
+      const area = document.getElementById('logArea');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${type}">${type === 'ok' ? '✓' : type === 'warn' ? '⚠' : '✗'}</span> ${msg}`;
+      area.appendChild(entry);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function toggleMic() {
+      if (!SpeechRecognition) {
+        updateStatus('❌ Speech recognition not supported', 'off');
+        addLog('Browser does not support Speech Recognition', 'err');
+        return;
+      }
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    }
+
+    function startListening() {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListening = true;
+        setMicState('listening');
+        updateStatus('🔴 Listening... Speak now', 'warn');
+        addLog('Started listening');
+      };
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        const displayText = finalTranscript || interimTranscript;
+        const html = finalTranscript + (interimTranscript ? `<span class="partial"> ${interimTranscript}</span>` : '');
+        document.getElementById('transcriptText').innerHTML = html || 'Listening...';
+        if (finalTranscript) {
+          addLog(`Transcribed: "${finalTranscript}"`);
+          sendToAI(finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') return;
+        updateStatus('❌ Error: ' + event.error, 'off');
+        addLog('Recognition error: ' + event.error, 'err');
+        stopListening();
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          // Auto-restart if still in listening mode
+          try { recognition.start(); } catch(e) { stopListening(); }
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch(e) {
+        addLog('Failed to start: ' + e.message, 'err');
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      setMicState('');
+      updateStatus('Tap the mic to speak', '');
+      addLog('Stopped listening');
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+        recognition = null;
+      }
+    }
+
+    async function sendToAI(text) {
+      const model = document.getElementById('modelSelect').value;
+      setMicState('thinking');
+      updateStatus('🧠 Thinking...', 'warn');
+      addLog(`Sending to ${model}...`, 'warn');
+      try {
+        const resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text, model: model })
+        });
+        const data = await resp.json();
+        const response = data.response || 'No response';
+        addLog(`AI: ${response.substring(0, 80)}...`);
+        document.getElementById('transcriptText').innerHTML = `<strong>You:</strong> ${text}<br><strong>AI:</strong> ${response}`;
+        speak(response);
+      } catch (e) {
+        addLog('AI error: ' + e.message, 'err');
+        setMicState('');
+        updateStatus('Error occurred', 'off');
+      }
+    }
+
+    function sendChat() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      addLog(`Sent: "${text}"`);
+      sendToAI(text);
+    }
+
+    function speak(text) {
+      if (!synth) return;
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 0.9;
+      utterance.onstart = () => {
+        setMicState('speaking');
+        updateStatus('🔊 Speaking...', 'warn');
+      };
+      utterance.onend = () => {
+        setMicState('');
+        updateStatus('Tap the mic to speak', '');
+      };
+      synth.speak(utterance);
+    }
+
+    // Keyboard shortcut
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        if (!isListening) startListening();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' && isListening) {
+        stopListening();
+      }
+    });
+
+    // Init
+    updateStatus('Ready — tap the mic', '');
+    addLog('Voice Agent ready');
+  </script>
+</body>
+</html>

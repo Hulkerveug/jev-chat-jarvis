@@ -20,7 +20,7 @@ import pvporcupine
 from engine.helper import extract_yt_term, markdown_to_text, remove_words
 from hugchat import hugchat
 
-con = sqlite3.connect("jarvis.db")
+con = sqlite3.connect("xtobe_ai.db")
 cursor = con.cursor()
 
 @eel.expose
@@ -80,7 +80,7 @@ def hotword():
     try:
        
         # pre trained keywords    
-        porcupine=pvporcupine.create(keywords=["jarvis","alexa"]) 
+        porcupine=pvporcupine.create(keywords=["xtobe","alexa"]) 
         paud=pyaudio.PyAudio()
         audio_stream=paud.open(rate=porcupine.sample_rate,channels=1,format=pyaudio.paInt16,input=True,frames_per_buffer=porcupine.frame_length)
         
@@ -139,17 +139,17 @@ def whatsApp(mobile_no, message, flag, name):
 
     if flag == 'message':
         target_tab = 12
-        jarvis_message = "message send successfully to "+name
+        xtobe_message = "message send successfully to "+name
 
     elif flag == 'call':
         target_tab = 7
         message = ''
-        jarvis_message = "calling to "+name
+        xtobe_message = "calling to "+name
 
     else:
         target_tab = 6
         message = ''
-        jarvis_message = "staring video call with "+name
+        xtobe_message = "staring video call with "+name
 
 
     # Encode the message for URL
@@ -172,7 +172,7 @@ def whatsApp(mobile_no, message, flag, name):
         pyautogui.hotkey('tab')
 
     pyautogui.hotkey('enter')
-    speak(jarvis_message)
+    speak(xtobe_message)
 
 # chat bot 
 def chatBot(query):
@@ -260,7 +260,6 @@ def geminai(query):
 def assistantName():
     name = ASSISTANT_NAME
     return name
-
 
 @eel.expose
 def personalInfo():

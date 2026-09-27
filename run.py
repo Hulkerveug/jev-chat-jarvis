@@ -1,10 +1,6 @@
- 
-
-import multiprocessing
-import subprocess
-
-# To run Jarvis
-def startJarvis():
+#!/usr/bin/env python3
+# To run Xtobe Ai
+def startXtobe():
         # Code for process 1
         print("Process 1 is running.")
         from main import start
@@ -17,10 +13,9 @@ def listenHotword():
         from engine.features import hotword
         hotword()
 
-
-    # Start both processes
+# Start both processes
 if __name__ == '__main__':
-        p1 = multiprocessing.Process(target=startJarvis)
+        p1 = multiprocessing.Process(target=startXtobe)
         p2 = multiprocessing.Process(target=listenHotword)
         p1.start()
         p2.start()
